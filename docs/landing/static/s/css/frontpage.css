@@ -226,10 +226,10 @@ input.gsc-search-button[title], input.gsc-search-button:hover[title], input.gsc-
 }
 
 #projectLogo {
-  background-image: url("../img/mongoReactiveLogo.png");
+  background-image: url("../img/mongoRxLogo.png");
   background-position: left top;
   background-repeat: no-repeat;
-  width: 213px;
+  width: 152px;
   height: 150px;
 }
 

@@ -5,18 +5,17 @@
   Select the version and dependency management system below and the snippet can be copied and pasted into your build.
 </p>
 <p>
-  Alternatively, head over to our documentation to learn more about getting started with Java, Reactive Streams, and MongoDB.
+  Alternatively, head over to our documentation to learn more about getting started with Java, RxJava, and MongoDB.
 </p>
-
+{{$githubRepo := $.Site.Data.releases.githubRepo}}
 {{ range where $.Site.Data.releases.versions "version" $.Site.Data.releases.current  }}{{ $.Scratch.Set "qs.currentReleasedVersion" . }}{{end }}
 {{$currentReleasedVersion := $.Scratch.Get "qs.currentReleasedVersion"}}
-
 <div id="downloadWidget">
   <div class="container">
     <div class="row downloadForm">
       <form>
         <div class="col-xs-5 col-lg-4 col-lg-push-2 ">
-        <h5>mongodb-driver-reactivestreams</h5>
+        <h5>{{$githubRepo}}</h5>
         </div>
     <div class="col-xs-5 col-lg-4 col-lg-push-2 ">
     {{ $.Scratch.Set "qs.pos" 0 }}
@@ -35,11 +34,10 @@
     </div>
   </form>
   <div class="hidden-md hidden-sm hidden-xs col-lg-2 col-lg-pull-10 downloadLink">
-  <a href="https://oss.sonatype.org/content/repositories/releases/org/mongodb/mongodb-driver-reactivestreams/{{$currentReleasedVersion.version}}/"
+  <a href="https://oss.sonatype.org/content/repositories/releases/org/mongodb/{{$githubRepo}}/{{$currentReleasedVersion.version}}/"
      id="downloadLink" class="btn btn-dark btn-download" target="_blank">Download</a>
   </div>
   </div>
-
 
   <div class="row">
   <div class="clipboard" title="copy">
