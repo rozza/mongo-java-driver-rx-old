@@ -17,20 +17,19 @@
 package tour;
 
 import com.mongodb.client.model.CreateCollectionOptions;
-import com.mongodb.reactivestreams.client.MongoClient;
-import com.mongodb.reactivestreams.client.MongoClients;
-import com.mongodb.reactivestreams.client.MongoCollection;
-import com.mongodb.reactivestreams.client.MongoDatabase;
-import com.mongodb.reactivestreams.client.Success;
+import com.mongodb.rx.client.MongoClient;
+import com.mongodb.rx.client.MongoClients;
+import com.mongodb.rx.client.MongoCollection;
+import com.mongodb.rx.client.MongoDatabase;
+import com.mongodb.rx.client.Success;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import rx.observers.TestSubscriber;
 
 import static com.mongodb.client.model.Filters.text;
 import static java.util.Arrays.asList;
-import static tour.SubscriberHelpers.ObservableSubscriber;
-import static tour.SubscriberHelpers.OperationSubscriber;
-import static tour.SubscriberHelpers.PrintDocumentSubscriber;
-import static tour.SubscriberHelpers.PrintSubscriber;
+import static tour.SubscriberHelpers.printDocumentSubscriber;
+import static tour.SubscriberHelpers.printSubscriber;
 
 /**
  * The QuickTourAdmin code example see: https://mongodb.github.io/mongo-java-driver/3.0/getting-started
@@ -59,72 +58,72 @@ public final class QuickTourAdmin {
 
         // get a handle to the "test" collection
         MongoCollection<Document> collection = database.getCollection("test");
-        ObservableSubscriber subscriber = new ObservableSubscriber<Success>();
+        TestSubscriber subscriber = new TestSubscriber<Success>();
         collection.drop().subscribe(subscriber);
-        subscriber.await();
+        subscriber.awaitTerminalEvent();
 
         // getting a list of databases
-        mongoClient.listDatabaseNames().subscribe(new PrintSubscriber<String>("Database Names: %s"));
+        mongoClient.listDatabaseNames().subscribe(printSubscriber("Database Names: "));
 
         // drop a database
-        subscriber = new ObservableSubscriber<Success>();
+        subscriber = new TestSubscriber();
         mongoClient.getDatabase("databaseToBeDropped").drop().subscribe(subscriber);
-        subscriber.await();
+        subscriber.awaitTerminalEvent();
 
         // create a collection
         database.createCollection("cappedCollection", new CreateCollectionOptions().capped(true).sizeInBytes(0x100000))
-                    .subscribe(new PrintSubscriber<Success>("Creation Created!"));
+                    .subscribe(printSubscriber("Collection Created! "));
 
 
-        database.listCollectionNames().subscribe(new PrintSubscriber<String>("Collection Names: %s"));
+        database.listCollectionNames().subscribe(printSubscriber("Collection Names: "));
 
         // drop a collection:
-        subscriber = new ObservableSubscriber<Success>();
+        subscriber = new TestSubscriber<Success>();
         collection.drop().subscribe(subscriber);
-        subscriber.await();
+        subscriber.awaitTerminalEvent();
 
         // create an ascending index on the "i" field
-        collection.createIndex(new Document("i", 1)).subscribe(new PrintSubscriber<String>("Created an index named: %s"));
+        collection.createIndex(new Document("i", 1)).subscribe(printSubscriber("Created an index named: "));
 
         // list the indexes on the collection
-        collection.listIndexes().subscribe(new PrintDocumentSubscriber());
+        collection.listIndexes().subscribe(printDocumentSubscriber());
 
 
         // create a text index on the "content" field
-        subscriber = new PrintSubscriber<String>("Created an index named: %s");
+        subscriber = printSubscriber("Created an index named: ");
         collection.createIndex(new Document("content", "text")).subscribe(subscriber);
-        subscriber.await();
+        subscriber.awaitTerminalEvent();
 
-        subscriber = new OperationSubscriber();
+        subscriber = new TestSubscriber();
         collection.insertMany(asList(new Document("_id", 0).append("content", "textual content"),
                 new Document("_id", 1).append("content", "additional content"),
                 new Document("_id", 2).append("content", "irrelevant content"))).subscribe(subscriber);
-        subscriber.await();
+        subscriber.awaitTerminalEvent();
 
         // Find using the text index
-        subscriber = new PrintSubscriber("Text search matches: %s");
+        subscriber = printSubscriber("Text search matches: ");
         collection.count(text("textual content -irrelevant")).subscribe(subscriber);
-        subscriber.await();
+        subscriber.awaitTerminalEvent();
 
         // Find using the $language operator
-        subscriber = new PrintSubscriber("Text search matches (english): %s");
+        subscriber = printSubscriber("Text search matches (english): ");
         Bson textSearch = text("textual content -irrelevant", "english");
         collection.count(textSearch).subscribe(subscriber);
-        subscriber.await();
+        subscriber.awaitTerminalEvent();
 
         // Find the highest scoring match
         System.out.print("Highest scoring document: ");
         Document projection = new Document("score", new Document("$meta", "textScore"));
-        collection.find(textSearch).projection(projection).first().subscribe(new PrintDocumentSubscriber());
+        collection.find(textSearch).projection(projection).first().subscribe(printDocumentSubscriber());
 
 
         // Run a command
-        database.runCommand(new Document("buildInfo", 1)).subscribe(new PrintDocumentSubscriber());
+        database.runCommand(new Document("buildInfo", 1)).subscribe(printDocumentSubscriber());
 
         // release resources
-        subscriber = new OperationSubscriber();
+        subscriber = new TestSubscriber();
         database.drop().subscribe(subscriber);
-        subscriber.await();
+        subscriber.awaitTerminalEvent();
         mongoClient.close();
     }
 
