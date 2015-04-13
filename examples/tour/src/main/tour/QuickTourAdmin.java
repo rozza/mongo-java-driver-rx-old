@@ -66,9 +66,7 @@ public final class QuickTourAdmin {
         mongoClient.listDatabaseNames().subscribe(printSubscriber("Database Names: "));
 
         // drop a database
-        subscriber = new TestSubscriber();
-        mongoClient.getDatabase("databaseToBeDropped").drop().subscribe(subscriber);
-        subscriber.awaitTerminalEvent();
+        mongoClient.getDatabase("databaseToBeDropped").drop().toBlocking().single();
 
         // create a collection
         database.createCollection("cappedCollection", new CreateCollectionOptions().capped(true).sizeInBytes(0x100000))
@@ -78,9 +76,7 @@ public final class QuickTourAdmin {
         database.listCollectionNames().subscribe(printSubscriber("Collection Names: "));
 
         // drop a collection:
-        subscriber = new TestSubscriber<Success>();
-        collection.drop().subscribe(subscriber);
-        subscriber.awaitTerminalEvent();
+        collection.drop().toBlocking().single();
 
         // create an ascending index on the "i" field
         collection.createIndex(new Document("i", 1)).subscribe(printSubscriber("Created an index named: "));

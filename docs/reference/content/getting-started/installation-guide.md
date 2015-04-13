@@ -14,7 +14,8 @@ The recommended way to get started using one of the drivers in your project is w
 
 {{< distroPicker >}}
 
-## MongoDB Reactive Streams Driver
-The Reactive Streams implementation for asynchronous stream processing with non-blocking back pressure.
+## MongoDB RxJava Driver
+An implementation of the MongoDB Driver providing support for [Reactive Extensions (RX)](http://reactivex.io/)
+ by using the [RxJava library](https://github.com/ReactiveX/RxJava).
 
-{{< install artifactId="mongodb-driver-reactivestreams" version="1.0.0" >}}
+{{< install artifactId="mongodb-driver-rx" version="1.0.0-rc0" mongoDriverVersion="3.0.0" rxJavaVersion="1.0.8">}}

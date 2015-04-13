@@ -43,22 +43,20 @@ into a previously non-existent collection.
 
 ## Get A List of Databases
 
-You can get a list of the available databases by calling the `listDatabaseNames` method.  Here we use the `PrintSubscriber` to print the list
-of database names:
+You can get a list of the available databases by calling the `listDatabaseNames` method.  Here we use the static `printSubscriber` helper 
+so that we can print the list of database names:
 
 ```java
-mongoClient.listDatabaseNames().subscribe(new PrintSubscriber<String>("Database Names: %s"));
+mongoClient.listDatabaseNames().subscribe(printSubscriber("Database Names: "));
 ```
 
 
 ## Drop A Database
 
-You can drop a database by name using a `MongoClient` instance. Here we wait for the `Publisher` to complete before continuing.
+You can drop a database by name using a `MongoClient` instance. Here we block for the `Observable` to complete before continuing.
 
 ```java
-subscriber = new ObservableSubscriber<Success>();
-mongoClient.getDatabase("databaseToBeDropped").drop().subscribe(subscriber);
-subscriber.await();
+mongoClient.getDatabase("databaseToBeDropped").drop().toBlocking().single();
 ```
 
 ## Create A Collection
@@ -69,7 +67,7 @@ you can also create a collection explicitly in order to to customize its configu
 
 ```java
 database.createCollection("cappedCollection", new CreateCollectionOptions().capped(true).sizeInBytes(0x100000))
-    .subscribe(new PrintSubscriber<Success>("Creation Created!"));
+    .subscribe(printSubscriber("Creation Created!"));
 ```
 
 ## Get A List of Collections
@@ -77,7 +75,7 @@ database.createCollection("cappedCollection", new CreateCollectionOptions().capp
 You can get a list of the available collections in a database:
 
 ```java
-database.listCollectionNames().subscribe(new PrintSubscriber<String>("Collection Names: %s"));
+database.listCollectionNames().subscribe(printSubscriber("Collection Names: %s"));
 ```
 
 ## Drop A Collection
@@ -85,9 +83,7 @@ database.listCollectionNames().subscribe(new PrintSubscriber<String>("Collection
 You can drop a collection by using the drop() method:
 
 ```java
-subscriber = new ObservableSubscriber<Success>();
-collection.drop().subscribe(subscriber);
-subscriber.await();
+collection.drop().toBlocking().single();
 ```
 
 ## Create An Index
@@ -98,7 +94,7 @@ For `1` ascending  or `-1` for descending. The following creates an ascending in
 
 ```java
 // create an ascending index on the "i" field
-collection.createIndex(new Document("i", 1)).subscribe(new PrintSubscriber<String>("Created an index named: %s"));
+collection.createIndex(new Document("i", 1)).subscribe(printSubscriber("Created an index named: "));
 ```
 
 ## Get a List of Indexes on a Collection
@@ -107,9 +103,7 @@ Use the `listIndexes()` method to get a list of indexes. The following uses the
 `PrintDocumentSubscriber` to print the json version of each index document:
 
 ```java
-subscriber = new PrintDocumentSubscriber()
-collection.listIndexes().subscribe(new PrintDocumentSubscriber());
-subscriber.await();
+collection.listIndexes().subscribe(printDocumentSubscriber());
 ```
 
 The example should print the following indexes:
@@ -128,9 +122,9 @@ literal "text" in the index document:
 
 ```java
 // create a text index on the "content" field
-subscriber = new PrintSubscriber<String>("Created an index named: %s");
+subscriber = printSubscriber("Created an index named: ");
 collection.createIndex(new Document("content", "text")).subscribe(subscriber);
-subscriber.await();
+subscriber.awaitTerminalEvent();
 ```
 
 As of MongoDB 2.6, text indexes are now integrated into the main query
@@ -138,27 +132,27 @@ language and enabled by default (here we use the [`Filters.text`]({{< coreapiref
 
 ```java
 // Insert some documents
-subscriber = new OperationSubscriber();
+subscriber = new TestSubscriber();
 collection.insertMany(asList(new Document("_id", 0).append("content", "textual content"),
         new Document("_id", 1).append("content", "additional content"),
         new Document("_id", 2).append("content", "irrelevant content"))).subscribe(subscriber);
-subscriber.await();
+subscriber.awaitTerminalEvent();
 
 // Find using the text index
-subscriber = new PrintSubscriber("Text search matches: %s");
+subscriber = printSubscriber("Text search matches: ");
 collection.count(text("textual content -irrelevant")).subscribe(subscriber);
-subscriber.await();
+subscriber.awaitTerminalEvent();
 
 // Find using the $language operator
-subscriber = new PrintSubscriber("Text search matches (english): %s");
+subscriber = printSubscriber("Text search matches (english): ");
 Bson textSearch = text("textual content -irrelevant", "english");
 collection.count(textSearch).subscribe(subscriber);
-subscriber.await();
+subscriber.awaitTerminalEvent();
 
 // Find the highest scoring match
 System.out.print("Highest scoring document: ");
 Document projection = new Document("score", new Document("$meta", "textScore"));
-collection.find(textSearch).projection(projection).first().subscribe(new PrintDocumentSubscriber());
+collection.find(textSearch).projection(projection).first().subscribe(printDocumentSubscriber());
 ```
 
 and it should print:
@@ -179,5 +173,5 @@ by using the [`runCommand()`]({{< apiref "com/mongodb/reactivestreams/client/mon
 method.  Here we call the [buildInfo]({{ docsref "reference/command/buildInfo" }}) command:
 
 ```java
-database.runCommand(new Document("buildInfo", 1)).subscribe(new PrintDocumentSubscriber());
+database.runCommand(new Document("buildInfo", 1)).subscribe(printDocumentSubscriber());
 ```

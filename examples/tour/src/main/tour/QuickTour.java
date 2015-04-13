@@ -28,11 +28,11 @@ import com.mongodb.rx.client.MongoCollection;
 import com.mongodb.rx.client.MongoDatabase;
 import com.mongodb.rx.client.Success;
 import org.bson.Document;
+import rx.Subscriber;
 import rx.observers.TestSubscriber;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
@@ -43,9 +43,9 @@ import static com.mongodb.client.model.Filters.lt;
 import static com.mongodb.client.model.Filters.lte;
 import static com.mongodb.client.model.Projections.excludeId;
 import static com.mongodb.client.model.Sorts.descending;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static tour.SubscriberHelpers.printDocumentSubscriber;
 import static tour.SubscriberHelpers.printSubscriber;
-
 
 /**
  * The QuickTour code example see: https://mongodb.github.io/mongo-java-driver-reactivestreams/1.0/getting-started
@@ -86,7 +86,7 @@ public final class QuickTour {
                 .append("count", 1)
                 .append("info", new Document("x", 203).append("y", 102));
 
-        collection.insertOne(doc).subscribe(printSubscriber());
+        collection.insertOne(doc).timeout(10, SECONDS).toBlocking().single();
 
         // get it (since it's the only one in there since we dropped the rest earlier on)
         collection.find().first().subscribe(printDocumentSubscriber());
@@ -97,7 +97,7 @@ public final class QuickTour {
             documents.add(new Document("i", i));
         }
 
-        collection.insertMany(documents).timeout(10, TimeUnit.SECONDS).toBlocking().single();
+        collection.insertMany(documents).timeout(10, SECONDS).toBlocking().single();
 
         subscriber = printSubscriber("total # of documents after inserting 100 small ones (should be 101): ");
         collection.count().subscribe(subscriber);

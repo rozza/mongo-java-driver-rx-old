@@ -16,7 +16,7 @@ source]({{< srcref "examples/tour/src/main/tour/QuickTour.java">}}).
 
 {{% note %}}
 See the [installation guide]({{< relref "getting-started/installation-guide.md" >}})
-for instructions on how to install the MongoDB Reactive Streams Java Driver.
+for instructions on how to install the MongoDB RxJava Driver.
 {{% /note %}}
 
 
@@ -52,7 +52,7 @@ At this point, the `database` object will be a connection to a MongoDB
 server for the specified database.
 
 {{% note %}}
-The API only returns `Publisher<T>` when network IO required for the operation. For 
+The API only returns `Observable<T>` or `MongoObservable<T>` when network IO required for the operation. For 
 `getDatabase("mydb")` there is no network IO required.
 A `MongoDatabase` instance provides methods to interact with a database
 but the database might not actually exist and will only be created on the
@@ -119,49 +119,46 @@ Document doc = new Document("name", "MongoDB")
 To insert the document into the collection, use the `insertOne()` method.
 
 ```java
-collection.insertOne(doc).subscribe(new OperationSubscriber<Success>());
+collection.insertOne(doc).timeout(10, SECONDS).toBlocking().single();
 ```
 
 {{% note class="important" %}}
-In the API all methods returning a `Publisher` are "cold" streams meaning that nothing happens until they are Subscribed to.
+In the API all methods returning a `Observables` are "cold" streams meaning that nothing happens until they are Subscribed to.
 
 The example below does nothing:
 
 ```java
-Publisher<Success> publisher = collection.insertOne(doc);
+Observable<Success> observable = collection.insertOne(doc);
 ```
 
-Only when a `Publisher` is subscribed to and data requested will the operation happen:
+Only when an `Observable` is subscribed to and data requested will the operation happen:
 
 ```java
-publisher.subscribe(new Subscriber<Success>() {
+// Explictly subscribe:
+observable.insertOne(doc).subscribe(new Subscriber<Success>() {
     @Override
-    public void onSubscribe(final Subscription s) {
-        s.request(1);  // <--- Data requested and the insertion will now occur
+    public void onCompleted() {
+        System.out.println("Completed");
+    }
+
+    @Override
+    public void onError(final Throwable e) {
+        System.out.println("Failed");
     }
 
     @Override
     public void onNext(final Success success) {
         System.out.println("Inserted");
     }
-
-    @Override
-    public void onError(final Throwable t) {
-        System.out.println("Failed");
-    }
-
-    @Override
-    public void onComplete() {
-        System.out.println("Completed");
-    }
 });
-```
-{{% /note %}}
 
+```
 
 Once the document has been inserted the `onNext` method will be called and it will
-print "Inserted!" followed by the `onComplete` method which will print "Completed".  
+print "Inserted!" followed by the `onCompleted` method which will print "Completed".  
 If there was an error for any reason the `onError` method would print "Failed".
+
+{{% /note %}}
 
 ## Add Multiple Documents
 
@@ -186,12 +183,11 @@ To insert these documents to the collection, pass the list of documents to the
 `insertMany()` method.
 
 ```java
-subscriber = new ObservableSubscriber<Success>();
-collection.insertMany(documents).subscribe(subscriber);
-subscriber.await();
+collection.insertMany(documents).timeout(10, SECONDS).toBlocking().single();
 ```
 
-Here we block on the `Publisher` to finish so that when we call the next operation we know the data has been inserted into the database!
+Here we block on the `Observable` to finish by calling `toBlocking().single()` so that when we call the next operation we know the data has 
+been  inserted into the database!
 
 ## Count Documents in A Collection
 
@@ -201,9 +197,9 @@ the first one), we can check to see if we have them all using the
 method. The following code should print `101`.
 
 ```java
-collection.count()
-          .subscribe(new PrintSubscriber<Long>("total # of documents after inserting "
-                                              + " 100 small ones (should be 101): %s"));
+subscriber = printSubscriber("total # of documents after inserting 100 small ones (should be 101): ");
+collection.count().subscribe(subscriber);
+subscriber.awaitTerminalEvent();
 ```
 
 ## Query the Collection
@@ -218,13 +214,13 @@ call the first() method on the result of the find() of method
 To get the first document in the collection, call the
 [first()]({{< apiref "com/mongodb/reactivestreams/client/MongoIterable.html#first--">}})
 method on the [find()]({{< apiref "com/mongodb/reactivestreams/client/MongoCollection.html#find--">}})
-operation. `collection.find().first()` returns the first document or if no document is found the publisher just completes.
+operation. `collection.find().first()` returns the first document or if no document is found the `Observable` just completes.
 This is useful for queries that should only match a single document, or if you are interested in the first document only.
 
 ```java
-subscriber = new PrintDocumentSubscriber();
+subscriber = printDocumentSubscriber();
 collection.find().first().subscribe(subscriber);
-subscriber.await();
+subscriber.awaitTerminalEvent();
 ```
 
 The example will print the following document:
@@ -245,15 +241,15 @@ names that start with
 ### Find All Documents in a Collection
 
 To retrieve all the documents in the collection, we will use the
-`find()` method. The `find()` method returns a `FindPublisher` instance that
+`find()` method. The `find()` method returns a `FindObservable` instance that
 provides a fluent interface for chaining or controlling find operations. 
 The following code retrieves all documents in the collection and prints them out
 (101 documents):
 
 ```java
-subscriber = new PrintDocumentSubscriber();
+subscriber = printDocumentSubscriber();
 collection.find().subscribe(subscriber);
-subscriber.await();
+subscriber.awaitTerminalEvent();
 ```
 
 ## Get A Single Document with a Query Filter
@@ -266,7 +262,7 @@ following:
 ```java
 import static com.mongodb.client.model.Filters.*;
 
-collection.find(eq("i", 71)).first().subscribe(new PrintDocumentSubscriber());
+collection.find(eq("i", 71)).first().subscribe(printDocumentSubscriber());
 ```
 
 will eventually print just one document:
@@ -288,24 +284,24 @@ write:
 
 ```java
 // now use a range query to get a larger subset
-collection.find(gt("i", 50)).subscribe(new PrintDocumentSubscriber());
+collection.find(gt("i", 50)).subscribe(printDocumentSubscriber());
 ```
 which should print the documents where `i > 50`.
 
 We could also get a range, say `50 < i <= 100`:
 
 ```java
-collection.find(and(gt("i", 50), lte("i", 100))).subscribe(new PrintDocumentSubscriber());
+collection.find(and(gt("i", 50), lte("i", 100))).subscribe(printDocumentSubscriber());
 ```
 
 ## Sorting documents
 
 We can also use the [Sorts]({{< coreapiref "com/mongodb/client/model/Sorts">}}) helpers to sort documents.
-We add a sort to a find query by calling the `sort()` method on a `FindPublisher`.  Below we use the [`exists()`]({{ < coreapiref "com/mongodb/client/model/Filters.html#exists-java.lang.String-">}}) helper and sort
+We add a sort to a find query by calling the `sort()` method on a `FindObservable`.  Below we use the [`exists()`]({{ < coreapiref "com/mongodb/client/model/Filters.html#exists-java.lang.String-">}}) helper and sort
 [`descending("i")`]({{ < coreapiref "com/mongodb/client/model/Sorts.html#exists-java.lang.String-">}}) helper to sort our documents:
 
 ```java
-collection.find(exists("i")).sort(descending("i")).subscribe(new PrintDocumentSubscriber());
+collection.find(exists("i")).sort(descending("i")).subscribe(printDocumentSubscriber());
 ```
 
 ## Projecting fields
@@ -315,7 +311,7 @@ helpers can be used to build the projection parameter for the find operation and
 Below we'll sort the collection, exclude the `_id` field and output the first matching document:
 
 ```java
-collection.find().projection(excludeId()).subscribe(new PrintDocumentSubscriber());
+collection.find().projection(excludeId()).subscribe(printDocumentSubscriber());
 ```
 
 ## Updating documents
@@ -328,7 +324,7 @@ method to specify the filter and the update document.  Here we update the first 
 
 ```java
 collection.updateOne(eq("i", 10), new Document("$set", new Document("i", 110)))
-          .subscribe(new PrintSubscriber<UpdateResult>("Update Result: %s"));
+          .subscribe(printSubscriber("Update Result: %s"));
 ```
 
 To update all documents matching the filter use the [`updateMany`]({{< apiref "com/mongodb/reactivestreams/client/MongoCollection.html#updateMany-org.bson.conversions.Bson-org.bson.conversions.Bson-">}})
@@ -337,7 +333,7 @@ is less than `100`.
 
 ```java
 collection.updateMany(lt("i", 100), new Document("$inc", new Document("i", 100)))
-          .subscribe(new PrintSubscriber<UpdateResult>("Update Result: %s"));
+          .subscribe(printSubscriber("Update Result: %s"));
 ```
 
 The update methods return an [`UpdateResult`]({{< coreapiref "com/mongodb/client/result/UpdateResult.html">}}),
@@ -350,7 +346,7 @@ method:
 
 ```java
 collection.deleteOne(eq("i", 110))
-          .subscribe(new PrintSubscriber<DeleteResult>("Delete Result: %s"));
+          .subscribe(printSubscriber("Delete Result: %s"));
 ```
 
 To delete all documents matching the filter use the [`deleteMany`]({{< apiref "com/mongodb/reactivestreams/client/MongoCollection.html#deleteMany-org.bson.conversions.Bson-">}}) method.  
@@ -358,7 +354,7 @@ Here we delete all documents where `i` is greater or equal to `100`:
 
 ```java
 collection.deleteMany(gte("i", 100)
-          .subscribe(new PrintSubscriber<DeleteResult>("Delete Result: %s"));
+          .subscribe(printSubscriber("Delete Result: %s"));
 ```
 
 The delete methods return a [`DeleteResult`]({{< coreapiref "com/mongodb/client/result/DeleteResult.html">}}),
@@ -385,7 +381,7 @@ operations:
 
 ```java
 // 1. Ordered bulk operation - order is guaranteed
-subscriber = new PrintSubscriber<BulkWriteResult>("Bulk write results: %s");
+subscriber = printSubscriber("Bulk write results: %s");
 collection.bulkWrite(
   Arrays.asList(new InsertOneModel<>(new Document("_id", 4)),
                 new InsertOneModel<>(new Document("_id", 5)),
@@ -396,10 +392,10 @@ collection.bulkWrite(
                 new ReplaceOneModel<>(new Document("_id", 3),
                                       new Document("_id", 3).append("x", 4)))
   ).subscribe(subscriber);
-subscriber.await();
+subscriber.awaitTerminalEvent();
 
  // 2. Unordered bulk operation - no guarantee of order of operation
-subscriber = new PrintSubscriber<BulkWriteResult>("Bulk write results: %s");
+subscriber = printSubscriber("Bulk write results: %s");
 collection.bulkWrite(
   Arrays.asList(new InsertOneModel<>(new Document("_id", 4)),
                 new InsertOneModel<>(new Document("_id", 5)),
@@ -411,7 +407,7 @@ collection.bulkWrite(
                                       new Document("_id", 3).append("x", 4))),
   new BulkWriteOptions().ordered(false)
   ).subscribe(subscriber);
-subscriber.await();
+subscriber.awaitTerminalEvent();
 ```
 
 {{% note class="important" %}}
